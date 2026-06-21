@@ -4,7 +4,7 @@
     {
       "src": "main.py",
       "use": "@vercel/python",
-      "config": { "includeFiles": ["templates/**"] }
+      "config": { "includeFiles": ["templates/**", "project_context.md"] }
     }
   ],
   "routes": [

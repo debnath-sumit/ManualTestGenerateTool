@@ -52,6 +52,11 @@ negative paths, and edge/boundary conditions. Derive cases from the \
 acceptance criteria where possible, and add sensible additional cases a \
 skilled tester would think of.
 
+If a "PROJECT CONTEXT" section is provided, treat it as authoritative \
+background about this specific project: prefer its terminology, respect its \
+testing standards and conventions, honour anything it marks as out of scope, \
+and make the test cases concrete and specific to that project.
+
 Return ONLY a JSON array (no prose, no markdown fences). Each element must be \
 an object with exactly these keys:
   - "id": string, like "TC-01"
@@ -66,8 +71,26 @@ Aim for 5-12 well-chosen test cases. Keep steps concrete and actionable.
 """
 
 
+def load_project_context() -> str:
+    """Read project_context.md if present. Read at request time so local edits
+    apply without a restart; on Vercel the file is bundled at deploy time."""
+    path = BASE_DIR / "project_context.md"
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except (FileNotFoundError, OSError):
+        return ""
+
+
 def build_user_prompt(req: GenerateRequest) -> str:
+    context = load_project_context()
+    context_block = (
+        f"PROJECT CONTEXT (authoritative background about this project):\n"
+        f"{context}\n\n---\n\n"
+        if context
+        else ""
+    )
     return (
+        f"{context_block}"
         f"Short Description:\n{req.short_description.strip()}\n\n"
         f"Description:\n{req.description.strip() or '(none provided)'}\n\n"
         f"Acceptance Criteria:\n{req.acceptance_criteria.strip() or '(none provided)'}\n"
