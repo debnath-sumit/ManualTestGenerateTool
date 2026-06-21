@@ -1,7 +1,7 @@
 """Manual Test Case Generator.
 
 A small FastAPI app that turns a Short Description, Description and
-Acceptance Criteria into structured manual test cases using Claude.
+Acceptance Criteria into structured manual test cases using Google Gemini.
 
 Run locally:
     uvicorn main:app --reload
@@ -20,14 +20,19 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-import anthropic
+from google import genai
+from google.genai import types, errors
 
-load_dotenv()
+# override=True so the .env value always wins over any stale GEMINI_API_KEY
+# left exported in the shell (a common source of 401 ACCESS_TOKEN errors).
+load_dotenv(override=True)
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
-MODEL = "claude-sonnet-4-6"
+# Free-tier Gemini model. Other working options: "gemini-2.5-flash-lite",
+# "gemini-flash-latest". (Note: gemini-2.0-flash had limit:0 free quota.)
+MODEL = "gemini-2.5-flash"
 
 app = FastAPI(title="Manual Test Case Generator")
 
@@ -99,32 +104,34 @@ async def generate(req: GenerateRequest):
             content={"error": "Short Description is required."},
         )
 
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+    api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         return JSONResponse(
             status_code=500,
             content={
-                "error": "ANTHROPIC_API_KEY is not set. Add it to .env "
-                "locally or to your Vercel environment variables."
+                "error": "GEMINI_API_KEY is not set. Add it to .env locally "
+                "or to your Vercel environment variables."
             },
         )
 
-    client = anthropic.Anthropic(api_key=api_key)
+    client = genai.Client(api_key=api_key)
     try:
-        message = client.messages.create(
+        response = client.models.generate_content(
             model=MODEL,
-            max_tokens=4096,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": build_user_prompt(req)}],
+            contents=build_user_prompt(req),
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_PROMPT,
+                response_mime_type="application/json",
+                max_output_tokens=8192,
+                temperature=0.7,
+            ),
         )
-        raw = "".join(
-            block.text for block in message.content if block.type == "text"
-        )
+        raw = response.text or ""
         test_cases = extract_json_array(raw)
-    except anthropic.APIError as exc:
+    except errors.APIError as exc:
         return JSONResponse(
             status_code=502,
-            content={"error": f"Claude API error: {exc}"},
+            content={"error": f"Gemini API error: {exc}"},
         )
     except (json.JSONDecodeError, ValueError):
         return JSONResponse(
