@@ -125,6 +125,7 @@
         <div class="row" style="margin:0;">
           <button class="secondary" id="copy">📋 Copy</button>
           <button class="secondary" id="csv">⬇️ Download CSV</button>
+          <button class="secondary" id="json">⬇️ Download JSON</button>
         </div>
       </div>
       <div style="overflow-x:auto;">
@@ -146,6 +147,7 @@
   <script>
     const $ = (id) => document.getElementById(id);
     let currentCases = [];
+    let currentInputs = { short_description: "", description: "", acceptance_criteria: "" };
 
     function showToast(msg) {
       const t = $("toast");
@@ -208,6 +210,7 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Request failed");
         currentCases = data.testCases || [];
+        currentInputs = payload;
         render(currentCases);
       } catch (e) {
         errBox.textContent = e.message;
@@ -252,14 +255,37 @@
       showToast("Copied to clipboard");
     });
 
-    $("csv").addEventListener("click", () => {
-      const blob = new Blob([toCSV(currentCases)], { type: "text/csv;charset=utf-8;" });
+    function download(filename, text, mime) {
+      const blob = new Blob([text], { type: mime });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "test-cases.csv";
+      a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
+    }
+
+    function slugify(s) {
+      return (String(s || "test-cases").toLowerCase().trim()
+        .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")) || "test-cases";
+    }
+
+    $("csv").addEventListener("click", () => {
+      download(slugify(currentInputs.short_description) + ".csv",
+        toCSV(currentCases), "text/csv;charset=utf-8;");
+    });
+
+    // JSON export — the handoff payload for the MyCucumberTest project.
+    $("json").addEventListener("click", () => {
+      const payload = {
+        shortDescription: currentInputs.short_description || "",
+        description: currentInputs.description || "",
+        acceptanceCriteria: currentInputs.acceptance_criteria || "",
+        generatedAt: new Date().toISOString(),
+        testCases: currentCases,
+      };
+      download(slugify(currentInputs.short_description) + ".json",
+        JSON.stringify(payload, null, 2), "application/json");
     });
   </script>
 </body>
