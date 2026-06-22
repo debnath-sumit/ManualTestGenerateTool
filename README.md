@@ -51,5 +51,5 @@ vercel.json          Vercel Python build + routing config
 
 ## Configuration
 
-- Model is set in `main.py` via `MODEL = "claude-sonnet-4-6"`. Change it
+- Model is set in `main.py` via `MODEL = "gemini-****-****"`. Change it
   there if you want a different Claude model.
